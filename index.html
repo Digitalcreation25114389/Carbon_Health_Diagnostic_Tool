@@ -179,7 +179,7 @@
 <section id="step-quiz" class="hidden"></section>
 <section id="step-result" class="hidden"></section>
 
-<footer class="foot">數位開創 DIGITAL CREATION · 企業碳健康健檢工具（內部測試版）</footer>
+<footer class="foot">數位開創 DIGITAL CREATION · 企業碳健康健檢工具</footer>
 </div>
 
 <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -1228,7 +1228,7 @@ async function exportPDF(){
     }
 
     const safeName=(state.meta.name||'企業').replace(/[\\/:*?"<>|]/g,'_');
-    const fname=`數位開創_${safeName}_碳健康健檢報告.pdf`;
+    const fname=`${safeName}_碳健康健檢報告.pdf`;
     pdf.save(fname);
     status.textContent='已匯出：'+fname;
   }catch(err){
