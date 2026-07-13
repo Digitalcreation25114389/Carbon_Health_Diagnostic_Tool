@@ -167,7 +167,7 @@
 <header>
   <div class="brand">數位開創 · DIGITAL CREATION</div>
   <h1 id="main-title">企業<em>碳健康</em>健檢</h1>
-  <p class="sub">花 3 分鐘回答幾個關於貴公司目前碳管理現況的問題，就能立即取得一份「碳健康健檢報告」：了解目前處於哪個階段、可能面臨什麼風險，以及接下來優先該做的事。填答內容僅儲存在你的瀏覽器，不會上傳到任何伺服器。</p>
+  <p class="sub">花 3 分鐘回答幾個關於貴公司目前碳管理現況的問題，就能立即看到整體健康度預覽：了解目前處於哪個階段、可能面臨什麼風險。填答內容會安全地儲存於雲端資料庫，付費 NT$1,000 即可解鎖完整碳健檢報告（含五大面向分析、國際接軌定位與 PDF 下載）。</p>
 </header>
 
 <div class="progress" id="progress-wrap" style="display:none">
@@ -177,6 +177,7 @@
 
 <section id="step-basic"></section>
 <section id="step-quiz" class="hidden"></section>
+<section id="step-paywall" class="hidden"></section>
 <section id="step-result" class="hidden"></section>
 
 <footer class="foot">數位開創 DIGITAL CREATION · 企業碳健康健檢工具</footer>
@@ -682,7 +683,8 @@ function serviceRanking(readiness,customerAsks,exportMarkets){
 }
 
 /* ---------- 狀態 ---------- */
-const state={meta:{name:'',industry:null,empSize:null,hasFactory:null,multiSite:null},answers:{},step:'basic'};
+const state={meta:{name:'',industry:null,empSize:null,hasFactory:null,multiSite:null},answers:{},step:'basic',submissionId:null};
+const SID_RE_CLIENT=/^[a-zA-Z0-9-]{1,50}$/;
 
 /* ---------- Step 1：企業基本資料 ---------- */
 function renderBasic(){
@@ -816,7 +818,7 @@ function renderQuiz(){
     $('#step-basic').classList.remove('hidden');
     window.scrollTo({top:0,behavior:'smooth'});
   };
-  $('#btn-to-result').onclick=()=>{ if(allAnswered()) goToResult(); };
+  $('#btn-to-result').onclick=()=>{ if(allAnswered()) goToPaywall(); };
 }
 function renderQuizAnswerState(){
   ALL_QUESTIONS.forEach(q=>{
@@ -938,7 +940,7 @@ function readableAnswerFor(q){
   }
 }
 async function saveSubmissionToDB(dimScores,overall,tier){
-  if(!supabaseClient){console.warn('Supabase 尚未載入，本次填答未儲存到雲端資料庫');return;}
+  if(!supabaseClient){console.warn('Supabase 尚未載入，本次填答未儲存到雲端資料庫');return null;}
   try{
     const readiness=intlReadiness();
     const stage=stageOf(readiness);
@@ -957,29 +959,156 @@ async function saveSubmissionToDB(dimScores,overall,tier){
       dim_reg:dimScores.reg,
       maturity_stage:stage.nm,
       meta:state.meta,
-      answers:state.answers
+      answers:state.answers,
+      paid:false
     };
     ALL_QUESTIONS.forEach(q=>{row['q_'+q.id]=readableAnswerFor(q);});
-    const {error}=await supabaseClient.from('submissions').insert(row);
-    if(error)console.error('儲存到雲端資料庫失敗：',error);
-    else console.info('已儲存到雲端資料庫。');
+    const {data,error}=await supabaseClient.from('submissions').insert(row).select('id').single();
+    if(error){console.error('儲存到雲端資料庫失敗：',error);return null;}
+    console.info('已儲存到雲端資料庫。');
+    return data.id;
   }catch(e){
     console.error('儲存到雲端資料庫時發生例外：',e);
+    return null;
   }
 }
 
-function goToResult(){
-  state.step='result';
+/* ---------- Step 3a：付款解鎖頁（顯示分數預覽，鎖住完整報告）---------- */
+function goToPaywall(){
+  state.step='paywall';
   $('#progress-wrap').style.display='none';
   $('#step-quiz').classList.add('hidden');
-  $('#step-result').classList.remove('hidden');
-  renderResult();
+  $('#step-result').classList.add('hidden');
+  $('#step-paywall').classList.remove('hidden');
   setMainTitle(state.meta.name);
+  window.scrollTo({top:0,behavior:'smooth'});
+  renderPaywall();
+}
+function renderPaywall(){
   const dimScores=scoreDimensions();
   const overall=overallScore(dimScores);
   const tier=classifyTier(overall);
-  saveSubmissionToDB(dimScores,overall,tier);
+  const el=$('#step-paywall');
+  el.innerHTML=`
+    <div class="sec-head"><span class="eyebrow">Step 3 / 3</span><h2>碳健康健檢報告</h2>
+      <p>已經算出貴公司的整體健康度，完整報告（五大面向分析、國際接軌定位、產業建議、行動計畫與 PDF 下載）需付費解鎖。</p></div>
+
+    <div class="health-panel">
+      <div class="gauge-wrap">
+        <div class="gauge-host">${gaugeSVG(overall,TIER_HEX[tier.key],tier.nm)}</div>
+        <div class="health-summary">
+          <div class="hs-title">整體健康度：${overall} 分（${tier.nm}）</div>
+          <p>${OVERALL_SUMMARY[tier.key](state.meta.name||'貴公司')}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="note-panel">
+      <div class="note-block">
+        <div class="note-title">🔒 解鎖完整報告後可以看到</div>
+        <ul>
+          <li>五大面向健康雷達圖，以及逐項的<b>現況分析／可能風險／改善建議</b></li>
+          <li>國際接軌定位與優先推動方向（ISO 14064／14067、供應鏈管理、DPP）</li>
+          <li>所屬產業與出口市場的具體注意事項</li>
+          <li>依健康度自動規劃的三階段 Action Plan</li>
+          <li>可下載留存的完整 PDF 健檢報告</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-pay" disabled>準備中…</button>
+      <button class="btn btn-ghost" id="btn-back-quiz">回上一步修改問卷</button>
+    </div>
+    <div class="status-line" id="paywall-status">正在安全儲存您的填答內容…</div>
+    <p class="note">付款由綠界科技（ECPay）代收，本站不會接觸或儲存您的信用卡卡號。</p>
+  `;
+
+  $('#btn-back-quiz').onclick=()=>{
+    state.step='quiz';
+    $('#step-paywall').classList.add('hidden');
+    $('#step-quiz').classList.remove('hidden');
+    $('#progress-wrap').style.display='block';
+    window.scrollTo({top:0,behavior:'smooth'});
+  };
+
+  const payBtn=$('#btn-pay');
+  const status=$('#paywall-status');
+  const enablePay=()=>{
+    payBtn.disabled=false;payBtn.textContent='立即付款解鎖完整報告（NT$1,000）';
+    status.textContent='';
+    payBtn.onclick=()=>{
+      payBtn.disabled=true;payBtn.textContent='正在導向付款頁面…';
+      location.href='/.netlify/functions/create-payment?sid='+encodeURIComponent(state.submissionId);
+    };
+  };
+
+  if(state.submissionId){
+    enablePay();
+  }else{
+    saveSubmissionToDB(dimScores,overall,tier).then(id=>{
+      if(id){
+        state.submissionId=id;
+        enablePay();
+      }else{
+        payBtn.disabled=false;payBtn.textContent='儲存失敗，點此重試';
+        status.textContent='填答內容儲存失敗，請檢查網路連線後重試。';
+        payBtn.onclick=renderPaywall;
+      }
+    });
+  }
+}
+
+/* ---------- Step 3b：確認付款結果並顯示完整報告 ---------- */
+function showUnlockedResult(){
+  state.step='result';
+  $('#progress-wrap').style.display='none';
+  $('#step-basic').classList.add('hidden');
+  $('#step-quiz').classList.add('hidden');
+  $('#step-paywall').classList.add('hidden');
+  $('#step-result').classList.remove('hidden');
+  setMainTitle(state.meta.name);
+  renderResult();
   window.scrollTo({top:0,behavior:'smooth'});
+}
+async function showUnlockCheck(sid){
+  $('#step-basic').classList.add('hidden');
+  $('#step-quiz').classList.add('hidden');
+  $('#step-result').classList.add('hidden');
+  $('#step-paywall').classList.remove('hidden');
+  $('#step-paywall').innerHTML=`
+    <div class="sec-head"><span class="eyebrow">確認付款中</span><h2>正在確認您的付款結果…</h2>
+      <p>請稍候，我們正在跟金流服務確認付款狀態，完成後會自動顯示完整報告，請不要關閉此頁面。</p></div>
+    <div class="status-line" id="unlock-status">確認中…</div>
+    <div class="btn-row hidden" id="unlock-retry-row">
+      <button class="btn btn-primary" id="btn-unlock-retry">重新檢查付款狀態</button>
+    </div>
+  `;
+  const ok=await pollPaidStatus(sid);
+  if(ok){
+    history.replaceState(null,'',location.pathname);
+  }else{
+    $('#unlock-status').textContent='尚未確認到付款結果。如果您已完成付款，請稍候片刻後點擊下方按鈕重新檢查；若尚未付款，請重新填寫問卷。';
+    $('#unlock-retry-row').classList.remove('hidden');
+    $('#btn-unlock-retry').onclick=()=>showUnlockCheck(sid);
+  }
+}
+async function pollPaidStatus(sid,maxTries=15,intervalMs=2000){
+  if(!supabaseClient){$('#unlock-status').textContent='雲端服務尚未載入，請重新整理頁面。';return false;}
+  for(let i=0;i<maxTries;i++){
+    try{
+      const {data,error}=await supabaseClient.from('submissions').select('id,paid,meta,answers').eq('id',sid).single();
+      if(!error&&data&&data.paid){
+        state.meta=data.meta||state.meta;
+        state.answers=data.answers||state.answers;
+        state.submissionId=data.id;
+        showUnlockedResult();
+        return true;
+      }
+    }catch(e){console.error('查詢付款狀態失敗',e);}
+    await new Promise(r=>setTimeout(r,intervalMs));
+  }
+  return false;
 }
 function setMainTitle(companyName){
   const el=$('#main-title');
@@ -1138,7 +1267,9 @@ function renderResult(){
     state.meta={name:'',industry:null,empSize:null,hasFactory:null,multiSite:null};
     state.answers={};
     state.step='basic';
+    state.submissionId=null;
     $('#step-result').classList.add('hidden');
+    $('#step-paywall').classList.add('hidden');
     $('#step-basic').classList.remove('hidden');
     renderBasic();
     setMainTitle(null);
@@ -1241,7 +1372,15 @@ async function exportPDF(){
 }
 
 /* ---------- 初始化 ---------- */
-renderBasic();
+(function initApp(){
+  const params=new URLSearchParams(location.search);
+  const sid=params.get('sid');
+  if(sid&&SID_RE_CLIENT.test(sid)){
+    showUnlockCheck(sid);
+  }else{
+    renderBasic();
+  }
+})();
 </script>
 </body>
 </html>
