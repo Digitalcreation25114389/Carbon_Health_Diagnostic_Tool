@@ -168,6 +168,18 @@
   <div class="brand">數位開創 · DIGITAL CREATION</div>
   <h1 id="main-title">企業<em>碳健康</em>健檢</h1>
   <p class="sub">花 3 分鐘回答幾個關於貴公司目前碳管理現況的問題，就能立即看到整體健康度預覽：了解目前處於哪個階段、可能面臨什麼風險。填答內容會安全地儲存於雲端資料庫，付費 NT$1,000 即可解鎖完整碳健檢報告（含五大面向分析、國際接軌定位與 PDF 下載）。</p>
+  <p class="sub" style="margin-top:8px"><a href="#" id="link-find-report" style="color:var(--teal);font-weight:700">已經付款過但找不到解鎖連結？點此找回我的報告</a></p>
+  <div id="find-report-panel" class="hidden" style="margin-top:16px;max-width:480px">
+    <label class="field-label">公司名稱</label>
+    <input class="text-in" id="find-company" placeholder="請輸入當初填寫的企業名稱">
+    <div style="height:14px"></div>
+    <label class="field-label">聯絡 Email</label>
+    <input class="text-in" id="find-email" type="email" placeholder="請輸入當初填寫的 Email">
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-find-report">查詢</button>
+    </div>
+    <div class="status-line" id="find-report-status"></div>
+  </div>
 </header>
 
 <div class="progress" id="progress-wrap" style="display:none">
@@ -683,8 +695,9 @@ function serviceRanking(readiness,customerAsks,exportMarkets){
 }
 
 /* ---------- 狀態 ---------- */
-const state={meta:{name:'',industry:null,empSize:null,hasFactory:null,multiSite:null},answers:{},step:'basic',submissionId:null};
+const state={meta:{name:'',email:'',industry:null,empSize:null,hasFactory:null,multiSite:null},answers:{},step:'basic',submissionId:null};
 const SID_RE_CLIENT=/^[a-zA-Z0-9-]{1,50}$/;
+const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /* ---------- Step 1：企業基本資料 ---------- */
 function renderBasic(){
@@ -695,6 +708,11 @@ function renderBasic(){
 
     <label class="field-label">企業名稱（將顯示於報告標題）</label>
     <input class="text-in" id="in-name" placeholder="例如：○○科技股份有限公司" value="${state.meta.name||''}">
+
+    <div style="height:20px"></div>
+    <label class="field-label">聯絡 Email</label>
+    <input class="text-in" id="in-email" type="email" placeholder="例如：contact@company.com" value="${state.meta.email||''}">
+    <p class="note" style="margin-top:6px">用於日後透過「找回我的報告」功能，憑公司名稱＋此 Email 重新取得解鎖連結，不會用於其他用途。</p>
 
     <div style="height:26px"></div>
     <label class="field-label">所屬產業</label>
@@ -730,13 +748,14 @@ function renderBasic(){
     </div>
   `;
   $('#in-name').oninput=e=>{state.meta.name=e.target.value;refreshBasicBtn();};
+  $('#in-email').oninput=e=>{state.meta.email=e.target.value;refreshBasicBtn();};
   $$('#tile-industry .tile').forEach(t=>t.onclick=()=>{state.meta.industry=t.dataset.k;renderBasic();});
   $$('#row-emp .opt-btn').forEach(t=>t.onclick=()=>{state.meta.empSize=t.dataset.k;renderBasic();});
   $$('#row-factory .opt-btn').forEach(t=>t.onclick=()=>{state.meta.hasFactory=t.dataset.k;renderBasic();});
   $$('#row-site .opt-btn').forEach(t=>t.onclick=()=>{state.meta.multiSite=t.dataset.k;renderBasic();});
   $('#btn-to-quiz').onclick=()=>{if(basicComplete())goToQuiz();};
 }
-function basicComplete(){return !!(state.meta.name && state.meta.name.trim() && state.meta.industry && state.meta.empSize && state.meta.hasFactory && state.meta.multiSite);}
+function basicComplete(){return !!(state.meta.name && state.meta.name.trim() && state.meta.email && EMAIL_RE.test(state.meta.email.trim()) && state.meta.industry && state.meta.empSize && state.meta.hasFactory && state.meta.multiSite);}
 function refreshBasicBtn(){const b=$('#btn-to-quiz');if(b)b.disabled=!basicComplete();}
 
 /* ---------- Step 2：問卷 ---------- */
@@ -944,8 +963,11 @@ async function saveSubmissionToDB(dimScores,overall,tier){
   try{
     const readiness=intlReadiness();
     const stage=stageOf(readiness);
+    const newId=crypto.randomUUID();
     const row={
+      id:newId,
       company_name:state.meta.name,
+      contact_email:state.meta.email,
       industry_label:INDUSTRIES[state.meta.industry]?INDUSTRIES[state.meta.industry].nm:null,
       emp_size_label:EMP_SIZES[state.meta.empSize]?EMP_SIZES[state.meta.empSize].nm:null,
       has_factory_label:FACTORY_OPTS[state.meta.hasFactory]?FACTORY_OPTS[state.meta.hasFactory].nm:null,
@@ -963,10 +985,10 @@ async function saveSubmissionToDB(dimScores,overall,tier){
       paid:false
     };
     ALL_QUESTIONS.forEach(q=>{row['q_'+q.id]=readableAnswerFor(q);});
-    const {data,error}=await supabaseClient.from('submissions').insert(row).select('id').single();
+    const {error}=await supabaseClient.from('submissions').insert(row);
     if(error){console.error('儲存到雲端資料庫失敗：',error);return null;}
     console.info('已儲存到雲端資料庫。');
-    return data.id;
+    return newId;
   }catch(e){
     console.error('儲存到雲端資料庫時發生例外：',e);
     return null;
@@ -1086,7 +1108,7 @@ async function showUnlockCheck(sid){
   `;
   const ok=await pollPaidStatus(sid);
   if(ok){
-    history.replaceState(null,'',location.pathname);
+    history.replaceState(null,'',location.pathname+'?sid='+encodeURIComponent(sid));
   }else{
     $('#unlock-status').textContent='尚未確認到付款結果。如果您已完成付款，請稍候片刻後點擊下方按鈕重新檢查；若尚未付款，請重新填寫問卷。';
     $('#unlock-retry-row').classList.remove('hidden');
@@ -1094,16 +1116,18 @@ async function showUnlockCheck(sid){
   }
 }
 async function pollPaidStatus(sid,maxTries=15,intervalMs=2000){
-  if(!supabaseClient){$('#unlock-status').textContent='雲端服務尚未載入，請重新整理頁面。';return false;}
   for(let i=0;i<maxTries;i++){
     try{
-      const {data,error}=await supabaseClient.from('submissions').select('id,paid,meta,answers').eq('id',sid).single();
-      if(!error&&data&&data.paid){
-        state.meta=data.meta||state.meta;
-        state.answers=data.answers||state.answers;
-        state.submissionId=data.id;
-        showUnlockedResult();
-        return true;
+      const res=await fetch('/.netlify/functions/check-payment-status?sid='+encodeURIComponent(sid));
+      if(res.ok){
+        const data=await res.json();
+        if(data.paid){
+          state.meta=data.meta||state.meta;
+          state.answers=data.answers||state.answers;
+          state.submissionId=sid;
+          showUnlockedResult();
+          return true;
+        }
       }
     }catch(e){console.error('查詢付款狀態失敗',e);}
     await new Promise(r=>setTimeout(r,intervalMs));
@@ -1172,13 +1196,42 @@ function renderResult(){
         </div>`).join('')}
     </div>
 
+    <div class="note-panel" style="margin-bottom:0">
+      <div class="note-block">
+        <div class="note-title">🔖 收藏這個專屬連結</div>
+        <p style="font-size:14.5px;color:var(--ink-2);line-height:1.7">
+          萬一瀏覽器不小心關閉或跳出，只要用下面這個網址重新打開，就能直接回到這份已解鎖的報告，不用重新付款：
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
+          <input class="text-in" id="unlock-link" readonly style="max-width:520px;font-size:13.5px" value="">
+          <button class="btn btn-ghost" id="btn-copy-link">複製連結</button>
+        </div>
+        <div class="note" id="copy-status" style="margin-top:6px"></div>
+      </div>
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-primary" id="btn-export-pdf">匯出健檢報告 PDF</button>
       <button class="btn btn-ghost" id="btn-restart">重新測試</button>
     </div>
     <div class="status-line" id="export-status"></div>
-    <p class="note">PDF 報告僅產生於你目前的瀏覽器中並直接下載，過程不會上傳到任何伺服器。</p>
+    <p class="note">PDF 匯出過程僅在你目前的瀏覽器中進行並直接下載，不會另外上傳。</p>
   `;
+
+  if(state.submissionId){
+    const unlockUrl=`${location.origin}${location.pathname}?sid=${encodeURIComponent(state.submissionId)}`;
+    const linkInput=$('#unlock-link');
+    linkInput.value=unlockUrl;
+    $('#btn-copy-link').onclick=async()=>{
+      try{
+        await navigator.clipboard.writeText(unlockUrl);
+        $('#copy-status').textContent='已複製，建議存到瀏覽器書籤或傳給自己保存。';
+      }catch(e){
+        linkInput.select();
+        $('#copy-status').textContent='請手動選取上面的網址並複製。';
+      }
+    };
+  }
 
   const dimList=$('#dim-list');
   DIM_ORDER.forEach(d=>{
@@ -1264,7 +1317,7 @@ function renderResult(){
 
   $('#btn-export-pdf').onclick=exportPDF;
   $('#btn-restart').onclick=()=>{
-    state.meta={name:'',industry:null,empSize:null,hasFactory:null,multiSite:null};
+    state.meta={name:'',email:'',industry:null,empSize:null,hasFactory:null,multiSite:null};
     state.answers={};
     state.step='basic';
     state.submissionId=null;
@@ -1372,7 +1425,42 @@ async function exportPDF(){
 }
 
 /* ---------- 初始化 ---------- */
+function setupFindReport(){
+  const link=$('#link-find-report');
+  const panel=$('#find-report-panel');
+  const status=$('#find-report-status');
+  link.onclick=(e)=>{
+    e.preventDefault();
+    panel.classList.toggle('hidden');
+  };
+  $('#btn-find-report').onclick=async()=>{
+    const companyName=$('#find-company').value.trim();
+    const email=$('#find-email').value.trim();
+    if(!companyName||!email){status.textContent='請輸入公司名稱與 Email。';return;}
+    const btn=$('#btn-find-report');
+    btn.disabled=true;btn.textContent='查詢中…';status.textContent='';
+    try{
+      const res=await fetch('/.netlify/functions/find-report',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({companyName,email})
+      });
+      const data=await res.json();
+      if(data.found){
+        location.href=location.pathname+'?sid='+encodeURIComponent(data.sid);
+      }else{
+        status.textContent='查無符合的已付款報告，請確認公司名稱與 Email 是否與當初填寫的一致。';
+      }
+    }catch(e){
+      status.textContent='查詢失敗，請稍後再試一次。';
+    }finally{
+      btn.disabled=false;btn.textContent='查詢';
+    }
+  };
+}
+
 (function initApp(){
+  setupFindReport();
   const params=new URLSearchParams(location.search);
   const sid=params.get('sid');
   if(sid&&SID_RE_CLIENT.test(sid)){
