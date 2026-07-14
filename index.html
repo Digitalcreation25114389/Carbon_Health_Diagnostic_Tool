@@ -242,6 +242,12 @@ const INDUSTRIES={
   pharma:{ic:'💊',nm:'製藥生技',ds:'原料藥、製劑；冷鏈與品質法規'},
   logistics:{ic:'🚚',nm:'物流運輸',ds:'倉儲、運配、車隊；範疇三移動燃燒為主'},
   semiconductor:{ic:'🔷',nm:'半導體光電',ds:'晶圓、封測、面板；含氟氣體高耗能'},
+  education:{ic:'🎓',nm:'教育與訓練',ds:'學校、補教、企業培訓；用電與差旅為主要排放源'},
+  retail:{ic:'🛒',nm:'零售與電商業',ds:'門市、電商平台、物流配送；包裝與運輸排放受關注'},
+  foodservice:{ic:'🍽️',nm:'餐飲與連鎖服務',ds:'餐廳、連鎖品牌、食品服務；廚餘與能源使用是重點'},
+  hospitality:{ic:'🏨',nm:'旅宿與觀光',ds:'飯店、民宿、旅行社；能源與水資源使用為主要項目'},
+  healthcare:{ic:'🏥',nm:'醫療與照護',ds:'醫院、診所、長照機構；能源與醫療廢棄物為關注重點'},
+  consulting:{ic:'💼',nm:'顧問服務',ds:'管理顧問、專業服務；差旅與辦公室用電為主要排放源'},
   general:{ic:'🏭',nm:'通用製造',ds:'未明確分類；以標準 14064/14067 框架評估'}
 };
 const EMP_SIZES={
@@ -261,7 +267,7 @@ const FACTORY_OPTS={
 };
 const SITE_OPTS={
   single:{nm:'單一據點'},
-  multi:{nm:'多個廠區或分公司'}
+  multi:{nm:'多個廠區、分公司或其他據點'}
 };
 
 /* ---------- 問卷題庫（五大主題，每主題 4 題）----------
@@ -470,14 +476,24 @@ const CATEGORIES=[
          {v:'1',t:'已完成 1～5 項產品',score:1},
          {v:'2',t:'已完成 6～20 項產品',score:2},
          {v:'3',t:'已完成 20 項以上產品',score:3}]},
+  {id:'supply_chain_surveyed',dim:null,t:'目前已經對多少家供應商進行碳排放調查？',
+   h:'這裡指的是「已經發出調查」的供應商數量，不論對方有沒有回覆或提供資料都算——重點是你們已經對多少家供應商提出過碳排放相關的調查或詢問。',
+   hint:'只要曾經正式發函、寄送問卷或系統性詢問過，就算「已對這家供應商進行調查」；單純口頭提過或還沒行動的不算。',
+   ex:'例如：已經發送碳排放調查表給 45 家主要供應商（不論對方是否已回覆），這樣算「30～100 家」。',
+   opts:[{v:'none',t:'尚未開始，一家都沒有',score:0},
+         {v:'under30',t:'小於 30 家',score:1},
+         {v:'range30to100',t:'30～100 家',score:2},
+         {v:'range100to249',t:'101～250 家',score:3},
+         {v:'over250',t:'251 家以上',score:3}]},
   {id:'supply_chain',dim:null,t:'目前已經完成碳排放調查或蒐集到碳資料的供應商，大約有幾家？',
-   h:'公司排放中有很大一部分其實來自上游供應商，這裡想了解實際已經配合提供資料的供應商「家數」，而不是有沒有發過要求。',
-   hint:'只要供應商已經回覆調查表或提供碳排放相關數字，就算「已完成」；只發出邀請但供應商尚未回覆的不算。',
-   ex:'例如：已發函給 10 家主要供應商，其中 3 家已回覆碳排放數據，這樣算「1～5 家」。',
-   opts:[{v:'0',t:'尚未開始，一家都還沒有',score:0},
-         {v:'1',t:'已完成 1～5 家供應商',score:1},
-         {v:'2',t:'已完成 6～20 家供應商',score:2},
-         {v:'3',t:'已完成 20 家以上供應商',score:3}]},
+   h:'公司排放中有很大一部分其實來自上游供應商，這裡想了解實際已經配合提供資料的供應商「家數」，而不是有沒有發過要求（有沒有發過要求算在上一題）。',
+   hint:'只要供應商已經回覆調查表或提供碳排放相關數字，就算「已取得碳資料」；只發出邀請但供應商尚未回覆的不算。',
+   ex:'例如：已發函給 45 家主要供應商（上一題算「30～100 家」），其中 20 家已回覆碳排放數據，這樣算「小於 30 家」。',
+   opts:[{v:'none',t:'尚未開始，一家都沒有',score:0},
+         {v:'under30',t:'小於 30 家',score:1},
+         {v:'range30to100',t:'30～100 家',score:2},
+         {v:'range100to249',t:'101～250 家',score:3},
+         {v:'over250',t:'251 家以上',score:3}]},
   {id:'dpp_awareness',dim:null,t:'對歐盟數位產品護照（DPP）的認知與準備程度？',
    h:'DPP 可以想成是產品的「電子身分證」，未來歐盟會要求特定產品必須附上這份資料（例如原料來源、碳足跡等），才能在歐盟市場銷售。',
    hint:'若完全沒聽過也沒關係，如實選擇即可，這是相對新的議題。',
@@ -643,6 +659,24 @@ const INDUSTRY_NOTES={
  semiconductor:['晶圓製造與封測製程能耗極高，且常使用含氟氣體（如 PFCs、SF6）等溫室效應強的製程氣體，建議優先掌握這部分排放。',
    '面板與半導體客戶（尤其國際品牌）已普遍要求供應商提供碳排放與能源使用資料。',
    '用電是半導體業最主要的排放來源之一，建議優先確認是否有機會採購再生能源憑證或提升能源效率。'],
+ education:['教育機構的碳排放通常集中在校園用電、空調與交通接送，建議優先盤點水電費與校車／通勤相關數據。',
+   '若承接政府或企業的培訓標案，近年評選標準已逐漸納入永續／ESG 相關條件，建議提前準備基本說明資料。',
+   '大型連鎖補教或訓練機構若有多個據點，建議建立統一的能源資料蒐集格式，方便日後跨據點比較。'],
+ retail:['零售與電商業的碳排放重點常在物流配送與包裝材料，建議優先掌握出貨件數與包材使用量。',
+   '國際電商平台或品牌客戶逐漸要求供應商／賣家提供碳足跡或永續資訊，建議留意平台端的相關規範更新。',
+   '門市若數量較多，建議建立各分店的用電、空調數據蒐集流程，作為後續盤查基礎。'],
+ foodservice:['餐飲業碳排放主要來自廚房用電／用氣、食材採購與廚餘處理，建議優先盤點這幾類數據。',
+   '連鎖品牌若有多家分店，建議統一制定資料蒐集範本，並指定各店回報窗口，避免資料分散難以彙整。',
+   '部分品牌客戶或加盟總部已開始要求門市配合基本的能源與廢棄物申報，建議提前了解總部的相關要求。'],
+ hospitality:['旅宿業的碳排放大宗通常是空調、熱水與洗滌用電，建議優先盤點各樓層或各房型的能源使用狀況。',
+   '國際訂房平台與部分企業客戶已開始要求提供永續認證或碳足跡資訊，建議留意平台端的相關要求。',
+   '觀光旅遊業常涉及交通運輸（遊覽車、渡輪等），若有自營車隊，建議一併列入排放源盤點範圍。'],
+ healthcare:['醫療院所的碳排放主要來自空調、醫療設備用電與滅菌設備，建議優先掌握這幾類設備的能源使用數據。',
+   '醫療廢棄物與感染性廢棄物的處理流程，除了既有的環保法規要求外，也逐漸成為機構永續報告的關注項目。',
+   '長照機構若有多個據點，建議建立統一的能源與廢棄物資料蒐集格式，方便集團層級的彙整分析。'],
+ consulting:['顧問服務業的碳排放通常以辦公室用電與差旅（客戶拜訪、專案出差）為主，建議優先盤點這兩類數據。',
+   '若服務對象涵蓋國際企業或上市櫃公司客戶，客戶端可能會要求顧問公司本身也提供碳排放或永續相關資料。',
+   '因應接案性質，建議建立每個專案的差旅碳排放估算方式，作為日後彙整公司整體碳足跡的基礎。'],
  general:['建議先盤點主要排放來源（通常是廠區用電與主要原物料），釐清排放結構，作為後續工作的基礎。',
    '若供應鏈中有前述特定產業（紡織、電子、金屬等）的客戶或供應商，可留意該產業別的特別要求。',
    '建議持續關注所屬產業公協會發布的碳相關指引，掌握同業共通的因應方向。']
@@ -656,6 +690,45 @@ const EXPORT_NOTES={
  sea:'東南亞市場的碳相關法規仍在發展中，但當地不少品牌代工客戶已開始要求碳盤查資料，建議提前準備。',
  other:'不同市場的要求落差較大，建議直接向當地客戶或買主確認實際的資料要求與時程。'
 };
+
+/* ---------- 供應鏈碳盤查完成度分析（範疇三 Scope 3）----------
+   用「已進行碳排放調查」與「已取得碳資料」這兩題的區間中位數估算完成率，
+   跟各產業的建議標準比較，獨立於既有的 0~3 分讀分邏輯（不影響雷達圖／成熟度計算）。
+*/
+const SUPPLY_CHAIN_OPT_LABEL={
+  none:'尚未開始，一家都沒有',under30:'小於 30 家',range30to100:'30～100 家',
+  range100to249:'101～250 家',over250:'251 家以上'
+};
+const SUPPLY_CHAIN_REPCOUNT={none:0,under30:15,range30to100:65,range100to249:175,over250:250};
+const INDUSTRY_SCOPE3_BENCHMARK={
+  textile:80,electronics:85,food:70,chemical:80,metal:80,auto:85,construction:70,pharma:65,
+  logistics:60,semiconductor:85,education:40,retail:65,foodservice:45,hospitality:45,
+  healthcare:50,consulting:40,general:60
+};
+function computeScope3Analysis(){
+  const surveyedV=state.answers.supply_chain_surveyed;
+  const completedV=state.answers.supply_chain;
+  const surveyedCount=SUPPLY_CHAIN_REPCOUNT[surveyedV]||0;
+  const completedCount=SUPPLY_CHAIN_REPCOUNT[completedV]||0;
+  const completionPct=surveyedCount>0?Math.min(100,Math.round(completedCount/surveyedCount*100)):0;
+  const benchmarkPct=INDUSTRY_SCOPE3_BENCHMARK[state.meta.industry]??60;
+  const gap=benchmarkPct-completionPct;
+  const met=gap<=0;
+  let message;
+  if(met){
+    message='已達到產業建議標準，供應鏈碳盤查基礎已相當穩固，建議持續維持資料更新頻率，並可考慮擴大蒐集範圍或提升資料品質（例如取得供應商第三方查證）。';
+  }else if(gap<=15){
+    message='目前已接近產業要求，建議優先完成剩餘高碳排供應商的碳資料蒐集，以提升供應鏈碳管理成熟度。';
+  }else{
+    message='目前完成度低於產業建議標準，建議優先盤查高採購金額、高碳排放或關鍵供應商，逐步提升範疇三碳盤查覆蓋率，以符合客戶及國際供應鏈管理要求。';
+  }
+  return {
+    surveyedLabel:SUPPLY_CHAIN_OPT_LABEL[surveyedV]||'未填寫',
+    completedLabel:SUPPLY_CHAIN_OPT_LABEL[completedV]||'未填寫',
+    completionPct,benchmarkPct,met,message
+  };
+}
+
 const SERVICE_REASON={
  iso64:{low:'目前尚未完成組織碳盤查，這是後續所有碳管理與國際接軌工作的基礎，建議優先啟動。',
         mid:'組織碳盤查已有初步進展，但尚未通過第三方查證，建議接下來強化查證與資料延續性。',
@@ -1255,7 +1328,6 @@ function renderResult(){
 
     <div class="btn-row">
       <button class="btn btn-primary" id="btn-export-pdf">匯出健檢報告 PDF</button>
-      <button class="btn btn-ghost" id="btn-restart">重新測試</button>
     </div>
     <div class="status-line" id="export-status"></div>
     <p class="note">PDF 匯出過程僅在你目前的瀏覽器中進行並直接下載，不會另外上傳。</p>
@@ -1312,6 +1384,7 @@ function renderResult(){
   const intlKeys=['iso64','iso67','supply','dpp'];
   const intlLabels={iso64:'ISO 14064',iso67:'ISO 14067',supply:'供應鏈管理',dpp:'DPP'};
   const intlPct=Object.fromEntries(intlKeys.map(k=>[k,Math.round(readiness[k]/3*100)]));
+  const scope3=computeScope3Analysis();
   $('#stage-panel').innerHTML=`
     <div class="stage-panel">
       <div class="stage-badge">${stage.nm}</div>
@@ -1330,6 +1403,13 @@ function renderResult(){
                   <div class="service-rank-n">完成度 ${Math.round(s.score/3*100)} ／ 100 分</div>
                   <div class="service-nm">${s.nm}</div>
                   <p>${SERVICE_REASON[s.key][readinessTier(s.score)]}</p>
+                  ${s.key==='supply'?`
+                  <div class="fact-row" style="margin-top:6px">
+                    <div><b>已調查供應商數</b>：${scope3.surveyedLabel}</div>
+                    <div><b>已取得碳資料供應商數</b>：${scope3.completedLabel}</div>
+                    <div><b>範疇三完成度</b>：${scope3.completionPct}％（產業建議標準 ${scope3.benchmarkPct}％，${scope3.met?'✅ 已達標':'⚠️ 尚未達標'}）</div>
+                  </div>
+                  <p><b>改善建議</b>：${scope3.message}</p>`:''}
                   <div class="exec-list-title">建議執行項目</div>
                   <ul class="exec-list">${EXECUTION_ITEMS[s.key].map(t=>`<li>${t}</li>`).join('')}</ul>
                 </div>`).join('')}
@@ -1359,18 +1439,6 @@ function renderResult(){
   `;
 
   $('#btn-export-pdf').onclick=exportPDF;
-  $('#btn-restart').onclick=()=>{
-    state.meta={name:'',email:'',industry:null,empSize:null,hasFactory:null,multiSite:null};
-    state.answers={};
-    state.step='basic';
-    state.submissionId=null;
-    $('#step-result').classList.add('hidden');
-    $('#step-paywall').classList.add('hidden');
-    $('#step-basic').classList.remove('hidden');
-    renderBasic();
-    setMainTitle(null);
-    window.scrollTo({top:0,behavior:'smooth'});
-  };
 }
 
 /* ---------- 匯出 PDF（將畫面截圖轉為多頁 PDF）---------- */
