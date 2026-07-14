@@ -73,6 +73,9 @@
   .q-hint{background:#F0EDE3;border-radius:8px;padding:9px 13px;font-size:14px;color:var(--ink-2);margin-bottom:8px}
   .q-example{background:var(--green-bg);border-radius:8px;padding:9px 13px;font-size:14px;color:var(--teal);margin-bottom:14px}
   .opt-list{display:flex;flex-direction:column;gap:8px}
+  .num-input-row{display:flex;align-items:center;gap:10px}
+  input.num-in{max-width:160px}
+  .num-unit{font-size:15.5px;font-weight:600;color:var(--ink-2)}
   .opt-long{display:flex;align-items:flex-start;gap:11px;text-align:left;border:1.5px solid var(--line);border-radius:10px;
     padding:12px 14px;background:#fff;cursor:pointer;font-family:inherit;font-size:15.5px;color:var(--ink-2);
     transition:.15s;line-height:1.5}
@@ -476,24 +479,15 @@ const CATEGORIES=[
          {v:'1',t:'已完成 1～5 項產品',score:1},
          {v:'2',t:'已完成 6～20 項產品',score:2},
          {v:'3',t:'已完成 20 項以上產品',score:3}]},
-  {id:'supply_chain_surveyed',dim:null,t:'目前已經對多少家供應商進行碳排放調查？',
+  {id:'supply_chain_surveyed',dim:null,numInput:true,unit:'家',t:'目前已經對多少家供應商進行碳排放調查？',
    h:'這裡指的是「已經發出調查」的供應商數量，不論對方有沒有回覆或提供資料都算——重點是你們已經對多少家供應商提出過碳排放相關的調查或詢問。',
-   hint:'只要曾經正式發函、寄送問卷或系統性詢問過，就算「已對這家供應商進行調查」；單純口頭提過或還沒行動的不算。',
-   ex:'例如：已經發送碳排放調查表給 45 家主要供應商（不論對方是否已回覆），這樣算「30～100 家」。',
-   opts:[{v:'none',t:'尚未開始，一家都沒有',score:0},
-         {v:'under30',t:'小於 30 家',score:1},
-         {v:'range30to100',t:'30～100 家',score:2},
-         {v:'range100to249',t:'101～250 家',score:3},
-         {v:'over250',t:'251 家以上',score:3}]},
-  {id:'supply_chain',dim:null,t:'目前已經完成碳排放調查或蒐集到碳資料的供應商，大約有幾家？',
+   hint:'只要曾經正式發函、寄送問卷或系統性詢問過，就算「已對這家供應商進行調查」；單純口頭提過或還沒行動的不算。請直接填入實際家數，例如 45。',
+   ex:'例如：已經發送碳排放調查表給 45 家主要供應商（不論對方是否已回覆），這裡就填 45。'},
+  {id:'supply_chain',dim:null,numInput:true,unit:'家',t:'目前已經完成碳排放調查或蒐集到碳資料的供應商，大約有幾家？',
    h:'公司排放中有很大一部分其實來自上游供應商，這裡想了解實際已經配合提供資料的供應商「家數」，而不是有沒有發過要求（有沒有發過要求算在上一題）。',
-   hint:'只要供應商已經回覆調查表或提供碳排放相關數字，就算「已取得碳資料」；只發出邀請但供應商尚未回覆的不算。',
-   ex:'例如：已發函給 45 家主要供應商（上一題算「30～100 家」），其中 20 家已回覆碳排放數據，這樣算「小於 30 家」。',
-   opts:[{v:'none',t:'尚未開始，一家都沒有',score:0},
-         {v:'under30',t:'小於 30 家',score:1},
-         {v:'range30to100',t:'30～100 家',score:2},
-         {v:'range100to249',t:'101～250 家',score:3},
-         {v:'over250',t:'251 家以上',score:3}]},
+   hint:'只要供應商已經回覆調查表或提供碳排放相關數字，就算「已取得碳資料」；只發出邀請但供應商尚未回覆的不算。請直接填入實際家數，此數字不應超過上一題填的家數。',
+   ex:'例如：上一題填了 45 家已發函調查，其中 20 家已回覆碳排放數據，這裡就填 20。',
+   scoreFromNum:(n)=>{n=Number(n)||0;if(n<=0)return 0;if(n<30)return 1;if(n<100)return 2;return 3;}},
   {id:'dpp_awareness',dim:null,t:'對歐盟數位產品護照（DPP）的認知與準備程度？',
    h:'DPP 可以想成是產品的「電子身分證」，未來歐盟會要求特定產品必須附上這份資料（例如原料來源、碳足跡等），才能在歐盟市場銷售。',
    hint:'若完全沒聽過也沒關係，如實選擇即可，這是相對新的議題。',
@@ -692,24 +686,17 @@ const EXPORT_NOTES={
 };
 
 /* ---------- 供應鏈碳盤查完成度分析（範疇三 Scope 3）----------
-   用「已進行碳排放調查」與「已取得碳資料」這兩題的區間中位數估算完成率，
+   用「已進行碳排放調查」與「已取得碳資料」這兩題填入的實際家數計算完成率，
    跟各產業的建議標準比較，獨立於既有的 0~3 分讀分邏輯（不影響雷達圖／成熟度計算）。
 */
-const SUPPLY_CHAIN_OPT_LABEL={
-  none:'尚未開始，一家都沒有',under30:'小於 30 家',range30to100:'30～100 家',
-  range100to249:'101～250 家',over250:'251 家以上'
-};
-const SUPPLY_CHAIN_REPCOUNT={none:0,under30:15,range30to100:65,range100to249:175,over250:250};
 const INDUSTRY_SCOPE3_BENCHMARK={
   textile:80,electronics:85,food:70,chemical:80,metal:80,auto:85,construction:70,pharma:65,
   logistics:60,semiconductor:85,education:40,retail:65,foodservice:45,hospitality:45,
   healthcare:50,consulting:40,general:60
 };
 function computeScope3Analysis(){
-  const surveyedV=state.answers.supply_chain_surveyed;
-  const completedV=state.answers.supply_chain;
-  const surveyedCount=SUPPLY_CHAIN_REPCOUNT[surveyedV]||0;
-  const completedCount=SUPPLY_CHAIN_REPCOUNT[completedV]||0;
+  const surveyedCount=Math.max(0,Number(state.answers.supply_chain_surveyed)||0);
+  const completedCount=Math.max(0,Number(state.answers.supply_chain)||0);
   const completionPct=surveyedCount>0?Math.min(100,Math.round(completedCount/surveyedCount*100)):0;
   const benchmarkPct=INDUSTRY_SCOPE3_BENCHMARK[state.meta.industry]??60;
   const gap=benchmarkPct-completionPct;
@@ -723,8 +710,8 @@ function computeScope3Analysis(){
     message='目前完成度低於產業建議標準，建議優先盤查高採購金額、高碳排放或關鍵供應商，逐步提升範疇三碳盤查覆蓋率，以符合客戶及國際供應鏈管理要求。';
   }
   return {
-    surveyedLabel:SUPPLY_CHAIN_OPT_LABEL[surveyedV]||'未填寫',
-    completedLabel:SUPPLY_CHAIN_OPT_LABEL[completedV]||'未填寫',
+    surveyedLabel:`${surveyedCount} 家`,
+    completedLabel:`${completedCount} 家`,
     completionPct,benchmarkPct,met,message
   };
 }
@@ -770,6 +757,7 @@ const STAGES=[
 function getAnswerScore(qid){
   const q=ALL_QUESTIONS.find(x=>x.id===qid);
   const a=state.answers[qid];
+  if(q.numInput)return typeof q.scoreFromNum==='function'?q.scoreFromNum(a):0;
   const o=q.opts.find(x=>x.v===a);
   return o&&typeof o.score==='number'?o.score:0;
 }
@@ -908,7 +896,11 @@ function renderQuiz(){
           <div class="qt">${q.t}</div>
           <div class="q-hint">💡 填寫提示：${q.hint}</div>
           <div class="q-example">📌 範例：${q.ex}</div>
-          ${q.multi?`
+          ${q.numInput?`
+          <div class="num-input-row">
+            <input type="number" class="text-in num-in" min="0" step="1" inputmode="numeric" data-q="${q.id}" placeholder="請輸入家數" value="${state.answers[q.id]??''}">
+            <span class="num-unit">${q.unit||''}</span>
+          </div>`:q.multi?`
           <div class="chip-row">
             ${q.opts.map(o=>`<button type="button" class="chip" data-q="${q.id}" data-v="${o.v}">${o.t}</button>`).join('')}
           </div>`:`
@@ -924,6 +916,14 @@ function renderQuiz(){
       state.answers[btn.dataset.q]=btn.dataset.v;
       renderQuizAnswerState();
       syncQuizButtons();
+    };
+  });
+  $$('#q-list .num-in').forEach(inp=>{
+    inp.oninput=()=>{
+      const v=inp.value;
+      state.answers[inp.dataset.q]=(v===''?'':Math.max(0,Math.round(Number(v)||0)));
+      syncQuizButtons();
+      updateQuizProgress();
     };
   });
   $$('#q-list .chip').forEach(btn=>{
@@ -964,6 +964,9 @@ function renderQuizAnswerState(){
       $$(`#q-list .opt-long[data-q="${q.id}"]`).forEach(btn=>btn.classList.toggle('on',btn.dataset.v===a));
     }
   });
+  updateQuizProgress();
+}
+function updateQuizProgress(){
   const answeredCount=ALL_QUESTIONS.filter(q=>isAnswered(q)).length;
   const pct=Math.round(answeredCount/ALL_QUESTIONS.length*100);
   $('#pfill').style.width=pct+'%';
@@ -972,6 +975,7 @@ function renderQuizAnswerState(){
 }
 function isAnswered(q){
   const a=state.answers[q.id];
+  if(q.numInput)return a!=null&&a!==''&&!isNaN(Number(a))&&Number(a)>=0;
   return q.multi?(Array.isArray(a)&&a.length>0):(a!=null);
 }
 function allAnswered(){return ALL_QUESTIONS.every(isAnswered);}
@@ -1067,6 +1071,9 @@ const supabaseClient=(window.supabase&&window.supabase.createClient)
   ?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
 function readableAnswerFor(q){
   const a=state.answers[q.id];
+  if(q.numInput){
+    return (a!=null&&a!=='')?`${a} ${q.unit||''}`.trim():'';
+  }
   if(q.multi){
     return (Array.isArray(a)&&a.length)?a.map(v=>{const o=q.opts.find(x=>x.v===v);return o?o.t:v;}).join('、'):'';
   }else{
