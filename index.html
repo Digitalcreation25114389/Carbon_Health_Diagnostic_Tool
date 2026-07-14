@@ -159,6 +159,16 @@
   footer.foot{font-size:11.5px;color:var(--gray);text-align:center;padding:30px 0 10px}
   .hidden{display:none !important}
   @media(max-width:600px){.gauge-wrap{flex-direction:column;align-items:flex-start}}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(22,36,31,.55);display:flex;align-items:center;justify-content:center;
+    padding:20px;z-index:100}
+  .modal-box{background:var(--panel);border-radius:16px;max-width:520px;width:100%;padding:28px 26px;box-shadow:var(--shadow);
+    max-height:86vh;overflow-y:auto}
+  .modal-box h3{font-size:19px;font-weight:800;margin-bottom:14px}
+  .modal-box ol{padding-left:20px;display:flex;flex-direction:column;gap:10px;font-size:14.5px;color:var(--ink-2);line-height:1.7;margin-bottom:18px}
+  .modal-box ol b{color:var(--ink)}
+  .modal-check{display:flex;align-items:flex-start;gap:9px;font-size:14.5px;color:var(--ink);cursor:pointer;margin-bottom:20px}
+  .modal-check input{margin-top:3px}
 </style>
 </head>
 <body>
@@ -193,6 +203,24 @@
 <section id="step-result" class="hidden"></section>
 
 <footer class="foot">數位開創 DIGITAL CREATION · 企業碳健康健檢工具</footer>
+</div>
+
+<div class="modal-overlay hidden" id="consent-modal">
+  <div class="modal-box">
+    <h3>開始填寫前，請詳閱並同意以下事項</h3>
+    <ol>
+      <li><b>資料存取與分析：</b>您所填寫的企業基本資料與問卷答案，將會被安全地存取並儲存於本站的雲端資料庫，用於產生您的碳健康健檢報告，以及後續彙整分析（例如產業趨勢統計）之用。</li>
+      <li><b>付費解鎖完整報告：</b>問卷填寫完成後可先免費預覽整體健康度分數；若要解鎖並下載完整碳健檢報告（含五大面向分析、國際接軌定位與 PDF 下載），需付費 <b>NT$1,000</b>。</li>
+    </ol>
+    <label class="modal-check">
+      <input type="checkbox" id="consent-check">
+      <span>我已閱讀並同意以上事項</span>
+    </label>
+    <div class="btn-row" style="margin-top:0">
+      <button class="btn btn-primary" id="btn-consent-agree" disabled>同意，開始填寫問卷</button>
+      <button class="btn btn-ghost" id="btn-consent-cancel">取消</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -753,7 +781,22 @@ function renderBasic(){
   $$('#row-emp .opt-btn').forEach(t=>t.onclick=()=>{state.meta.empSize=t.dataset.k;renderBasic();});
   $$('#row-factory .opt-btn').forEach(t=>t.onclick=()=>{state.meta.hasFactory=t.dataset.k;renderBasic();});
   $$('#row-site .opt-btn').forEach(t=>t.onclick=()=>{state.meta.multiSite=t.dataset.k;renderBasic();});
-  $('#btn-to-quiz').onclick=()=>{if(basicComplete())goToQuiz();};
+  $('#btn-to-quiz').onclick=()=>{if(basicComplete())openConsentModal();};
+}
+function openConsentModal(){
+  const check=$('#consent-check');
+  check.checked=false;
+  $('#btn-consent-agree').disabled=true;
+  $('#consent-modal').classList.remove('hidden');
+}
+function closeConsentModal(){
+  $('#consent-modal').classList.add('hidden');
+}
+function setupConsentModal(){
+  const check=$('#consent-check');
+  check.onchange=()=>{$('#btn-consent-agree').disabled=!check.checked;};
+  $('#btn-consent-cancel').onclick=closeConsentModal;
+  $('#btn-consent-agree').onclick=()=>{closeConsentModal();goToQuiz();};
 }
 function basicComplete(){return !!(state.meta.name && state.meta.name.trim() && state.meta.email && EMAIL_RE.test(state.meta.email.trim()) && state.meta.industry && state.meta.empSize && state.meta.hasFactory && state.meta.multiSite);}
 function refreshBasicBtn(){const b=$('#btn-to-quiz');if(b)b.disabled=!basicComplete();}
@@ -1461,6 +1504,7 @@ function setupFindReport(){
 
 (function initApp(){
   setupFindReport();
+  setupConsentModal();
   const params=new URLSearchParams(location.search);
   const sid=params.get('sid');
   if(sid&&SID_RE_CLIENT.test(sid)){
