@@ -599,9 +599,21 @@ const OVERALL_SUMMARY={
 const PHASE_LABELS=['立即可做','3～6 個月','6～12 個月'];
 const DIM_ACTIONS={
  mgmt:{
-  low:['指定一位窗口人員，作為未來碳排放相關詢問的第一線聯絡人','向內部主管簡單說明碳管理的必要性，爭取基本時間與資源'],
-  mid:['正式指定一位對口窗口（可先由兼任開始）','設定一個具體、有數字的初步減碳目標，作為申請預算的依據'],
-  high:['將現有分工方式簡單文件化，並讓至少兩人熟悉作業流程','設定更明確、可對外公開的減碳目標與時程']
+  low:{
+   sme:['指定一位窗口人員（可先用兼任方式），作為未來碳排放相關詢問的第一線聯絡人','向負責人簡單說明碳管理的必要性，爭取基本時間與資源'],
+   mid:['指定一位窗口人員，作為未來碳排放相關詢問的第一線聯絡人','向內部主管簡單說明碳管理的必要性，爭取基本時間與資源'],
+   group:['在現有部門下指定一位對口窗口，作為跨廠區碳排放詢問的第一線聯絡人','向管理層簡要說明碳管理的必要性，爭取跨部門資源與授權']
+  },
+  mid:{
+   sme:['正式指定一位對口窗口（可先由負責人或行政人員兼任）','設定一個具體、有數字的初步減碳目標，作為未來申請資源的依據'],
+   mid:['正式指定一位對口窗口（可先由兼任開始）','設定一個具體、有數字的初步減碳目標，作為申請預算的依據'],
+   group:['正式指定專責小組或跨部門對口窗口','設定具體、有數字的減碳目標，並向管理層報告作為預算依據']
+  },
+  high:{
+   sme:['將現有分工方式簡單記錄下來，並讓至少一位同仁熟悉流程備援','設定更明確的減碳目標，並視情況對客戶或外部說明'],
+   mid:['將現有分工方式簡單文件化，並讓至少兩人熟悉作業流程','設定更明確、可對外公開的減碳目標與時程'],
+   group:['將分工方式制度化為正式作業規範，並納入內部稽核機制','設定更明確、可對外公開的減碳目標與時程，並延伸至各廠區']
+  }
  },
  data:{
   low:['請財務或總務單位協助彙整最近一年的電費帳單，作為起點','建立基本的資料保存習慣，例如統一用一份 Excel 表格記錄'],
@@ -624,13 +636,66 @@ const DIM_ACTIONS={
   high:['定期（例如每半年）檢視最新收到的客戶問卷或要求','評估是否需要主動準備單一產品的碳足跡數據，提前因應']
  }
 };
-function buildActionPlan(dimScores){
-  const sorted=[...DIM_ORDER].sort((a,b)=>dimScores[a]-dimScores[b]);
-  const itemsFor=d=>DIM_ACTIONS[d][tierOfScore(dimScores[d])];
+const FOCUS_LABELS={iso64:'ISO 14064',iso67:'ISO 14067',supply:'供應鏈管理',dpp:'DPP'};
+const COMBO_RULES=[
+ {pair:['data','digital'],
+  items:['評估導入單一雲端表單或系統，讓各單位資料統一登錄與更新',
+    '同步整理近一年的能源使用資料，作為系統上線後的第一批基準資料',
+    '訂出資料填報的固定週期與負責窗口，確保系統上線後能持續維護']},
+ {pair:['mgmt','exec'],
+  items:['指定一位窗口人員，並由這位窗口牽頭進行公司第一次完整碳盤查',
+    '盤查同時，順勢向內部主管說明目前現況，爭取後續資源與授權',
+    '將這次盤查的過程記錄下來，作為未來每年更新的基礎流程']},
+ {pair:['reg','supply'],test:customerAsks=>customerAsks.includes('supply'),
+  items:['客戶已明確要求供應鏈碳排放資料，建議優先啟動供應商碳排放調查',
+    '先鎖定與該客戶訂單相關的關鍵供應商，優先取得其碳排放數據',
+    '將已取得的供應商資料整理成可直接回覆客戶的格式，加快回覆速度']},
+ {pair:['reg','iso67'],test:customerAsks=>customerAsks.includes('iso67'),
+  items:['客戶已要求特定產品的碳足跡數據，建議優先針對該產品進行碳足跡計算',
+    '蒐集該產品的原料來源、製程、運輸等生命週期資料',
+    '將計算結果整理成可直接回覆客戶的格式，並評估是否需要對外揭露']}
+];
+function computeUnifiedFocusItems(dimScores,readiness,customerAsks,exportMarkets){
+  const eu=exportMarkets.includes('eu');
+  const asked=k=>customerAsks.includes(k);
+  const healthItems=DIM_ORDER.map(d=>({type:'health',key:d,nm:DIM_META[d].nm,
+    tier:tierOfScore(dimScores[d]),urgency:100-dimScores[d]}));
+  const intlKeys=['iso64','iso67','supply','dpp'];
+  const intlItems=intlKeys.map(k=>{
+    const base=Math.round((3-readiness[k])/3*100);
+    const bonus=(asked(k)?15:0)+((k==='iso67'&&eu)?8:0)+((k==='dpp'&&eu)?15:0);
+    return {type:'intl',key:k,nm:FOCUS_LABELS[k],tier:readinessTier(readiness[k]),urgency:Math.min(100,base+bonus)};
+  });
+  return [...healthItems,...intlItems].sort((a,b)=>b.urgency-a.urgency);
+}
+function itemActionsFor(item,scaleKey){
+  if(item.type==='health'){
+    if(item.key==='mgmt')return DIM_ACTIONS.mgmt[item.tier][scaleKey];
+    return DIM_ACTIONS[item.key][item.tier];
+  }
+  return EXECUTION_ITEMS[item.key][item.tier];
+}
+function buildActionPlan(dimScores,readiness,customerAsks,exportMarkets,scaleKey){
+  const sorted=computeUnifiedFocusItems(dimScores,readiness,customerAsks,exportMarkets);
+  const top2=[sorted[0].key,sorted[1].key];
+  const combo=COMBO_RULES.find(c=>{
+    const samePair=c.pair.slice().sort().join()===top2.slice().sort().join();
+    if(!samePair)return false;
+    return c.test?c.test(customerAsks):true;
+  });
+  if(combo){
+    const rest=sorted.slice(2,5);
+    return [
+      {dims:combo.pair.map(k=>FOCUS_LABELS[k]||DIM_META[k].nm),items:combo.items},
+      {dims:[rest[0].nm],items:itemActionsFor(rest[0],scaleKey)},
+      {dims:rest.slice(1).map(it=>it.nm),items:rest.slice(1).map(it=>itemActionsFor(it,scaleKey)[0])}
+    ];
+  }
+  const rest=sorted.slice(2,5);
   return [
-    {dims:[sorted[0]],items:itemsFor(sorted[0])},
-    {dims:[sorted[1]],items:itemsFor(sorted[1])},
-    {dims:sorted.slice(2),items:sorted.slice(2).map(d=>itemsFor(d)[0])}
+    {dims:[sorted[0].nm],items:itemActionsFor(sorted[0],scaleKey)},
+    {dims:[sorted[1].nm],items:itemActionsFor(sorted[1],scaleKey)},
+    {dims:rest.map(it=>it.nm),items:rest.map(it=>itemActionsFor(it,scaleKey)[0])}
   ];
 }
 
@@ -1321,6 +1386,9 @@ function renderResult(){
   const overall=overallScore(dimScores);
   const tier=classifyTier(overall);
   const scaleKey=EMP_SIZES[state.meta.empSize].scale;
+  const readiness=intlReadiness();
+  const customerAsks=Array.isArray(state.answers.customer_ask_type)?state.answers.customer_ask_type:[];
+  const exportMarkets=Array.isArray(state.answers.export_market)?state.answers.export_market:[];
   const el=$('#step-result');
 
   el.innerHTML=`
@@ -1361,11 +1429,11 @@ function renderResult(){
     <div id="note-panel"></div>
 
     <div class="sec-head" style="margin-top:8px"><span class="eyebrow">Action Plan</span><h2>下一步建議</h2>
-      <p>依貴公司五大面向中「分數最低」的項目優先排序，建議由「立即可做」開始，逐步往後推進。</p></div>
+      <p>綜合五大健康面向與國際接軌四項（ISO 14064／14067、供應鏈、DPP）的急迫程度，排出最需要優先處理的項目，建議由「立即可做」開始，逐步往後推進。</p></div>
     <div class="phase-grid">
-      ${buildActionPlan(dimScores).map((phase,i)=>`
+      ${buildActionPlan(dimScores,readiness,customerAsks,exportMarkets,scaleKey).map((phase,i)=>`
         <div class="phase-card">
-          <div class="phase-title">第 ${i+1} 階段｜${PHASE_LABELS[i]}（聚焦：${phase.dims.map(d=>DIM_META[d].nm).join('、')}）</div>
+          <div class="phase-title">第 ${i+1} 階段｜${PHASE_LABELS[i]}（聚焦：${phase.dims.join('、')}）</div>
           <ul>${phase.items.map(t=>`<li>${t}</li>`).join('')}</ul>
         </div>`).join('')}
     </div>
@@ -1433,10 +1501,7 @@ function renderResult(){
     dimList.appendChild(card);
   });
 
-  const readiness=intlReadiness();
   const stage=stageOf(readiness);
-  const customerAsks=Array.isArray(state.answers.customer_ask_type)?state.answers.customer_ask_type:[];
-  const exportMarkets=Array.isArray(state.answers.export_market)?state.answers.export_market:[];
   const intlInitiatives=Array.isArray(state.answers.intl_initiative)?state.answers.intl_initiative:[];
   const ranked=serviceRanking(readiness,customerAsks,exportMarkets);
   const intlKeys=['iso64','iso67','supply','dpp'];
