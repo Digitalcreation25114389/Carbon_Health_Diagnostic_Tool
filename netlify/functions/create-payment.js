@@ -1,6 +1,7 @@
 const { genCheckMacValue, genMerchantTradeNo, ecpayTradeDate } = require('./_ecpay');
 
 const ECPAY_CHECKOUT_URL = 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5';
+const SITE_URL = 'https://digitalcreationservice.netlify.app';
 const AMOUNT = 1000; // 固定金額，絕不信任前端傳來的金額
 const SID_RE = /^[a-zA-Z0-9-]{1,50}$/;
 
@@ -22,7 +23,7 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: '伺服器尚未設定綠界金流環境變數' };
   }
 
-  const siteUrl = `https://${event.headers.host}`;
+  const siteUrl = SITE_URL;
 
   const params = {
     MerchantID: ECPAY_MERCHANT_ID,

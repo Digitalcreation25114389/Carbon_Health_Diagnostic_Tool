@@ -1,3 +1,7 @@
+function escapeLike(s) {
+  return s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
@@ -28,8 +32,8 @@ exports.handler = async (event) => {
   try {
     const params = new URLSearchParams({
       select: 'id,created_at',
-      company_name: `ilike.${companyName}`,
-      contact_email: `ilike.${email}`,
+      company_name: `ilike.${escapeLike(companyName)}`,
+      contact_email: `ilike.${escapeLike(email)}`,
       paid: 'eq.true',
       order: 'created_at.desc',
       limit: '1',
