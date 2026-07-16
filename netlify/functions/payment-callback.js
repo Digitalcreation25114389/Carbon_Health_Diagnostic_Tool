@@ -1,6 +1,8 @@
 const { genCheckMacValue } = require('./_ecpay');
+const { issueInvoice } = require('./_issue_invoice');
 
 const SID_RE = /^[a-zA-Z0-9-]{1,50}$/;
+const AMOUNT = 1000;
 
 function parseBody(event) {
   const raw = event.isBase64Encoded
@@ -36,6 +38,7 @@ exports.handler = async (event) => {
   }
 
   if (fields.RtnCode === '1') {
+    let row;
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/submissions?id=eq.${encodeURIComponent(sid)}`,
@@ -45,7 +48,7 @@ exports.handler = async (event) => {
             apikey: SUPABASE_SERVICE_ROLE_KEY,
             Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
             'Content-Type': 'application/json',
-            Prefer: 'return=minimal',
+            Prefer: 'return=representation',
           },
           body: JSON.stringify({
             paid: true,
@@ -59,9 +62,21 @@ exports.handler = async (event) => {
         console.error('更新 Supabase paid 狀態失敗', res.status, await res.text());
         return { statusCode: 200, body: '0|DB Update Failed' };
       }
+      const rows = await res.json();
+      row = rows[0];
     } catch (e) {
       console.error('呼叫 Supabase 時發生例外', e);
       return { statusCode: 200, body: '0|DB Exception' };
+    }
+
+    if (row) {
+      // paid=true 已經寫入成功，這裡失敗只影響發票、不影響使用者解鎖報告；
+      // 但仍要 await，因為 Netlify Functions 一旦回應就可能凍結執行環境，fire-and-forget 不保證會跑完
+      try {
+        await issueInvoiceForSubmission(sid, row, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      } catch (e) {
+        console.error('開立發票時發生未預期例外', sid, e);
+      }
     }
   } else {
     console.warn('收到綠界付款失敗通知', fields.RtnCode, fields.RtnMsg);
@@ -69,3 +84,44 @@ exports.handler = async (event) => {
 
   return { statusCode: 200, body: '1|OK' };
 };
+
+async function issueInvoiceForSubmission(sid, row, supabaseUrl, serviceRoleKey) {
+  const meta = row.meta || {};
+  const relateNumber = ('IV' + sid.replace(/-/g, '')).slice(0, 30);
+  const result = await issueInvoice({
+    relateNumber,
+    amount: AMOUNT,
+    meta,
+    contactEmail: row.contact_email,
+    companyName: row.company_name,
+  });
+
+  if (!result.ok) {
+    console.error('開立發票失敗', sid, result.error);
+  }
+
+  const updatedMeta = {
+    ...meta,
+    invoiceStatus: result.ok ? 'issued' : 'failed',
+    invoiceNo: result.ok ? result.invoiceNo : null,
+    invoiceIssuedAt: result.ok ? new Date().toISOString() : null,
+    invoiceError: result.ok ? null : String(result.error || ''),
+  };
+
+  const patchRes = await fetch(
+    `${supabaseUrl}/rest/v1/submissions?id=eq.${encodeURIComponent(sid)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ meta: updatedMeta }),
+    }
+  );
+  if (!patchRes.ok) {
+    console.error('寫回發票開立結果失敗', sid, patchRes.status, await patchRes.text());
+  }
+}

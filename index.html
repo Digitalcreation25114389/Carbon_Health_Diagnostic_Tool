@@ -1248,6 +1248,19 @@ function goToPaywall(){
   window.scrollTo({top:0,behavior:'smooth'});
   renderPaywall();
 }
+function isValidTaxId(id){
+  if(!/^\d{8}$/.test(id))return false;
+  const weights=[1,2,1,2,1,2,4,1];
+  const digits=id.split('').map(Number);
+  let sum=0;
+  for(let i=0;i<8;i++){
+    const product=digits[i]*weights[i];
+    sum+=Math.floor(product/10)+(product%10);
+  }
+  if(sum%10===0)return true;
+  if(digits[6]===7&&(sum+1)%10===0)return true;
+  return false;
+}
 function renderPaywall(){
   const dimScores=scoreDimensions();
   const overall=overallScore(dimScores);
@@ -1280,6 +1293,30 @@ function renderPaywall(){
       </div>
     </div>
 
+    <div class="note-panel">
+      <div class="note-block">
+        <div class="note-title">🧾 發票資訊</div>
+        <div class="btn-row" style="margin-top:6px">
+          <label><input type="radio" name="invoice-type" value="individual" checked> 個人</label>
+          <label><input type="radio" name="invoice-type" value="company"> 公司（需統一編號）</label>
+        </div>
+        <div id="invoice-company-fields" class="hidden" style="margin-top:10px">
+          <label class="field-label">統一編號</label>
+          <input class="text-in" id="in-tax-id" maxlength="8" placeholder="請輸入 8 碼統一編號">
+          <div style="height:10px"></div>
+          <label class="field-label">發票抬頭</label>
+          <input class="text-in" id="in-invoice-title" placeholder="預設為填寫的公司名稱">
+        </div>
+        <div id="invoice-individual-fields" style="margin-top:10px">
+          <label><input type="checkbox" id="in-donate"> 捐贈發票（不索取紙本，不需留存扣抵）</label>
+          <div id="invoice-lovecode-field" class="hidden" style="margin-top:8px">
+            <label class="field-label">愛心碼</label>
+            <input class="text-in" id="in-love-code" placeholder="請輸入捐贈愛心碼">
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-primary" id="btn-pay" disabled>準備中…</button>
       <button class="btn btn-ghost" id="btn-back-quiz">回上一步修改問卷</button>
@@ -1287,6 +1324,22 @@ function renderPaywall(){
     <div class="status-line" id="paywall-status">正在安全儲存您的填答內容…</div>
     <p class="note">付款由綠界科技（ECPay）代收，本站不會接觸或儲存您的信用卡卡號。</p>
   `;
+
+  const invoiceCompanyFields=$('#invoice-company-fields');
+  const invoiceIndividualFields=$('#invoice-individual-fields');
+  const invoiceLoveCodeField=$('#invoice-lovecode-field');
+  document.querySelectorAll('input[name="invoice-type"]').forEach(r=>{
+    r.onchange=()=>{
+      const isCompany=r.value==='company'&&r.checked;
+      if(r.checked){
+        invoiceCompanyFields.classList.toggle('hidden',!isCompany);
+        invoiceIndividualFields.classList.toggle('hidden',isCompany);
+      }
+    };
+  });
+  $('#in-donate').onchange=(e)=>{
+    invoiceLoveCodeField.classList.toggle('hidden',!e.target.checked);
+  };
 
   $('#btn-back-quiz').onclick=()=>{
     state.step='quiz';
@@ -1301,8 +1354,42 @@ function renderPaywall(){
   const enablePay=()=>{
     payBtn.disabled=false;payBtn.textContent='立即付款解鎖完整報告（NT$1,000）';
     status.textContent='';
-    payBtn.onclick=()=>{
-      payBtn.disabled=true;payBtn.textContent='正在導向付款頁面…';
+    payBtn.onclick=async()=>{
+      const invType=document.querySelector('input[name="invoice-type"]:checked').value;
+      const invoiceMeta={invoiceType:invType};
+      if(invType==='company'){
+        const taxId=$('#in-tax-id').value.trim();
+        if(!isValidTaxId(taxId)){
+          status.textContent='統一編號格式不正確，請確認是否為 8 碼數字且輸入無誤。';
+          return;
+        }
+        invoiceMeta.taxId=taxId;
+        invoiceMeta.invoiceTitle=$('#in-invoice-title').value.trim()||state.meta.name;
+        invoiceMeta.donate=false;
+      }else{
+        const donate=$('#in-donate').checked;
+        invoiceMeta.donate=donate;
+        if(donate){
+          const loveCode=$('#in-love-code').value.trim();
+          if(!loveCode){
+            status.textContent='選擇捐贈發票需要填寫愛心碼。';
+            return;
+          }
+          invoiceMeta.loveCode=loveCode;
+        }
+      }
+
+      payBtn.disabled=true;payBtn.textContent='正在儲存發票資訊…';status.textContent='';
+      state.meta={...state.meta,...invoiceMeta};
+      const {error}=await supabaseClient.from('submissions').update({meta:state.meta}).eq('id',state.submissionId);
+      if(error){
+        console.error('更新發票資訊失敗：',error);
+        payBtn.disabled=false;payBtn.textContent='立即付款解鎖完整報告（NT$1,000）';
+        status.textContent='發票資訊儲存失敗，請稍後再試一次。';
+        return;
+      }
+
+      payBtn.textContent='正在導向付款頁面…';
       location.href='/.netlify/functions/create-payment?sid='+encodeURIComponent(state.submissionId);
     };
   };
