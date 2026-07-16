@@ -1300,18 +1300,29 @@ function renderPaywall(){
           <label><input type="radio" name="invoice-type" value="individual" checked> 個人</label>
           <label><input type="radio" name="invoice-type" value="company"> 公司（需統一編號）</label>
         </div>
+        <div style="margin-top:10px">
+          <label class="field-label">聯絡電話（選填）</label>
+          <input class="text-in" id="in-invoice-phone" placeholder="方便日後對帳或發票問題聯繫">
+        </div>
         <div id="invoice-company-fields" class="hidden" style="margin-top:10px">
           <label class="field-label">統一編號</label>
           <input class="text-in" id="in-tax-id" maxlength="8" placeholder="請輸入 8 碼統一編號">
           <div style="height:10px"></div>
           <label class="field-label">發票抬頭</label>
           <input class="text-in" id="in-invoice-title" placeholder="預設為填寫的公司名稱">
+          <div style="height:10px"></div>
+          <label class="field-label">發票地址（選填，索取紙本才需要）</label>
+          <input class="text-in" id="in-invoice-addr-company" placeholder="不需要紙本發票可留空">
         </div>
         <div id="invoice-individual-fields" style="margin-top:10px">
           <label><input type="checkbox" id="in-donate"> 捐贈發票（不索取紙本，不需留存扣抵）</label>
           <div id="invoice-lovecode-field" class="hidden" style="margin-top:8px">
             <label class="field-label">愛心碼</label>
             <input class="text-in" id="in-love-code" placeholder="請輸入捐贈愛心碼">
+          </div>
+          <div id="invoice-addr-individual-field" style="margin-top:8px">
+            <label class="field-label">發票地址（選填，索取紙本才需要）</label>
+            <input class="text-in" id="in-invoice-addr-individual" placeholder="不需要紙本發票可留空">
           </div>
         </div>
       </div>
@@ -1337,8 +1348,10 @@ function renderPaywall(){
       }
     };
   });
+  const invoiceAddrIndividualField=$('#invoice-addr-individual-field');
   $('#in-donate').onchange=(e)=>{
     invoiceLoveCodeField.classList.toggle('hidden',!e.target.checked);
+    invoiceAddrIndividualField.classList.toggle('hidden',e.target.checked);
   };
 
   $('#btn-back-quiz').onclick=()=>{
@@ -1356,7 +1369,7 @@ function renderPaywall(){
     status.textContent='';
     payBtn.onclick=async()=>{
       const invType=document.querySelector('input[name="invoice-type"]:checked').value;
-      const invoiceMeta={invoiceType:invType};
+      const invoiceMeta={invoiceType:invType,invoicePhone:$('#in-invoice-phone').value.trim()};
       if(invType==='company'){
         const taxId=$('#in-tax-id').value.trim();
         if(!isValidTaxId(taxId)){
@@ -1365,6 +1378,7 @@ function renderPaywall(){
         }
         invoiceMeta.taxId=taxId;
         invoiceMeta.invoiceTitle=$('#in-invoice-title').value.trim()||state.meta.name;
+        invoiceMeta.invoiceAddress=$('#in-invoice-addr-company').value.trim();
         invoiceMeta.donate=false;
       }else{
         const donate=$('#in-donate').checked;
@@ -1376,6 +1390,8 @@ function renderPaywall(){
             return;
           }
           invoiceMeta.loveCode=loveCode;
+        }else{
+          invoiceMeta.invoiceAddress=$('#in-invoice-addr-individual').value.trim();
         }
       }
 
