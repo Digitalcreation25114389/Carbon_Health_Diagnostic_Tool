@@ -1432,20 +1432,30 @@ async function showUnlockCheck(sid){
   $('#step-result').classList.add('hidden');
   $('#step-paywall').classList.remove('hidden');
   $('#step-paywall').innerHTML=`
-    <div class="sec-head"><span class="eyebrow">確認付款中</span><h2>正在確認您的付款結果…</h2>
-      <p>請稍候，我們正在跟金流服務確認付款狀態，完成後會自動顯示完整報告，請不要關閉此頁面。</p></div>
+    <div class="sec-head"><span class="eyebrow">確認付款中</span><h2 id="unlock-title">正在確認您的付款結果…</h2>
+      <p id="unlock-desc">請稍候，我們正在跟金流服務確認付款狀態，完成後會自動顯示完整報告，請不要關閉此頁面。</p></div>
     <div class="status-line" id="unlock-status">確認中…</div>
     <div class="btn-row hidden" id="unlock-retry-row">
       <button class="btn btn-primary" id="btn-unlock-retry">重新檢查付款狀態</button>
+      <button class="btn btn-primary" id="btn-unlock-repay">重新嘗試付款</button>
+      <button class="btn btn-ghost" id="btn-unlock-restart">重新填寫問卷</button>
     </div>
   `;
   const ok=await pollPaidStatus(sid);
   if(ok){
     history.replaceState(null,'',location.pathname+'?sid='+encodeURIComponent(sid));
   }else{
-    $('#unlock-status').textContent='尚未確認到付款結果。如果您已完成付款，請稍候片刻後點擊下方按鈕重新檢查；若尚未付款，請重新填寫問卷。';
+    $('#unlock-title').textContent='未確認到付款成功';
+    $('#unlock-desc').textContent='可能是付款失敗、在綠界頁面取消，或是還在處理中。';
+    $('#unlock-status').textContent='目前查不到這筆訂單的付款成功紀錄，您可以重新檢查一次、直接重新嘗試付款，或是重新填寫問卷。';
     $('#unlock-retry-row').classList.remove('hidden');
     $('#btn-unlock-retry').onclick=()=>showUnlockCheck(sid);
+    $('#btn-unlock-repay').onclick=()=>{
+      location.href='/.netlify/functions/create-payment?sid='+encodeURIComponent(sid);
+    };
+    $('#btn-unlock-restart').onclick=()=>{
+      location.href=location.pathname;
+    };
   }
 }
 async function pollPaidStatus(sid,maxTries=15,intervalMs=2000){
