@@ -1,6 +1,6 @@
 const { genCheckMacValue, genMerchantTradeNo, ecpayTradeDate } = require('./_ecpay');
 
-const ECPAY_CHECKOUT_URL = 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5';
+const ECPAY_CHECKOUT_URL = 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5';
 const SITE_URL = 'https://digitalcreationservice.netlify.app';
 const AMOUNT = 1000; // 固定金額，絕不信任前端傳來的金額
 const SID_RE = /^[a-zA-Z0-9-]{1,50}$/;
