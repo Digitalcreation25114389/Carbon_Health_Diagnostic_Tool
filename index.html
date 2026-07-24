@@ -180,8 +180,12 @@
 <header>
   <div class="brand">數位開創 · DIGITAL CREATION</div>
   <h1 id="main-title">企業<em>碳健康</em>健檢</h1>
-  <p class="sub">花 3 分鐘回答幾個關於貴公司目前碳管理現況的問題，就能立即看到整體健康度預覽：了解目前處於哪個階段、可能面臨什麼風險。填答內容會安全地儲存於雲端資料庫，付費 NT$1,000 即可解鎖完整碳健檢報告（含五大面向分析、國際接軌定位與 PDF 下載）。</p>
-  <p class="sub" style="margin-top:8px"><a href="#" id="link-find-report" style="color:var(--teal);font-weight:700">已經付款過但找不到解鎖連結？點此找回我的報告</a></p>
+  <p class="sub">客戶開始要碳排放數據、卻不知道從哪裡開始準備？花 3 分鐘回答問卷，立即看到貴公司目前的碳管理健康度，了解處於哪個階段、可能面臨什麼風險。</p>
+  <p class="sub" style="margin-top:8px">完整報告（五大面向分析、國際接軌定位與 PDF 下載）原價 <b>$5,000</b>，線上自主健檢推廣價只要 <b>NT$1,000</b>，且可全額折抵日後 ISO 14064／14067、供應鏈碳排放調查或 DPP 輔導服務費用。</p>
+  <div class="btn-row" style="margin-top:16px">
+    <button class="btn btn-ghost" id="btn-view-demo" type="button">先看範例報告，了解可以拿到什麼</button>
+  </div>
+  <p class="sub" style="margin-top:16px"><a href="#" id="link-find-report" style="color:var(--teal);font-weight:700">已經付款過但找不到解鎖連結？點此找回我的報告</a></p>
   <div id="find-report-panel" class="hidden" style="margin-top:16px;max-width:480px">
     <label class="field-label">公司名稱</label>
     <input class="text-in" id="find-company" placeholder="請輸入當初填寫的企業名稱">
@@ -213,17 +217,17 @@
 
 <div class="modal-overlay hidden" id="consent-modal">
   <div class="modal-box">
-    <h3>開始填寫前，請詳閱並同意以下事項</h3>
+    <h3>送出問卷前，請詳閱並同意以下事項</h3>
     <ol>
       <li><b>資料存取與分析：</b>您所填寫的企業基本資料與問卷答案，將會被安全地存取並儲存於本站的雲端資料庫，用於產生您的碳健康健檢報告，以及後續彙整分析（例如產業趨勢統計）之用。</li>
-      <li><b>付費解鎖完整報告：</b>問卷填寫完成後可先免費預覽整體健康度分數；若要解鎖並下載完整碳健檢報告（含五大面向分析、國際接軌定位與 PDF 下載），需付費 <b>NT$1,000</b>。</li>
+      <li><b>付費解鎖完整報告：</b>接下來會先免費顯示整體健康度分數；若要解鎖並下載完整碳健檢報告（含五大面向分析、國際接軌定位與 PDF 下載），需付費 <b>NT$1,000</b>（原價 $5,000）。這筆費用日後可全額折抵採購 ISO 14064、ISO 14067、供應鏈碳排放調查或 DPP 輔導服務時的費用。</li>
     </ol>
     <label class="modal-check">
       <input type="checkbox" id="consent-check">
       <span>我已閱讀並同意以上事項</span>
     </label>
     <div class="btn-row" style="margin-top:0">
-      <button class="btn btn-primary" id="btn-consent-agree" disabled>同意，開始填寫問卷</button>
+      <button class="btn btn-primary" id="btn-consent-agree" disabled>同意，查看我的健檢結果</button>
       <button class="btn btn-ghost" id="btn-consent-cancel">取消</button>
     </div>
   </div>
@@ -903,7 +907,7 @@ function serviceRanking(readiness,customerAsks,exportMarkets){
 }
 
 /* ---------- 狀態 ---------- */
-const state={meta:{name:'',email:'',industry:null,empSize:null,hasFactory:null,multiSite:null},answers:{},step:'basic',submissionId:null};
+const state={meta:{name:'',email:'',industry:null,empSize:null,hasFactory:null,multiSite:null},answers:{},step:'basic',submissionId:null,isDemo:false};
 const SID_RE_CLIENT=/^[a-zA-Z0-9-]{1,50}$/;
 const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -961,7 +965,7 @@ function renderBasic(){
   $$('#row-emp .opt-btn').forEach(t=>t.onclick=()=>{state.meta.empSize=t.dataset.k;renderBasic();});
   $$('#row-factory .opt-btn').forEach(t=>t.onclick=()=>{state.meta.hasFactory=t.dataset.k;renderBasic();});
   $$('#row-site .opt-btn').forEach(t=>t.onclick=()=>{state.meta.multiSite=t.dataset.k;renderBasic();});
-  $('#btn-to-quiz').onclick=()=>{if(basicComplete())openConsentModal();};
+  $('#btn-to-quiz').onclick=()=>{if(basicComplete())goToQuiz();};
 }
 function openConsentModal(){
   const check=$('#consent-check');
@@ -976,10 +980,57 @@ function setupConsentModal(){
   const check=$('#consent-check');
   check.onchange=()=>{$('#btn-consent-agree').disabled=!check.checked;};
   $('#btn-consent-cancel').onclick=closeConsentModal;
-  $('#btn-consent-agree').onclick=()=>{closeConsentModal();goToQuiz();};
+  $('#btn-consent-agree').onclick=()=>{closeConsentModal();goToPaywall();};
 }
 function basicComplete(){return !!(state.meta.name && state.meta.name.trim() && state.meta.email && EMAIL_RE.test(state.meta.email.trim()) && state.meta.industry && state.meta.empSize && state.meta.hasFactory && state.meta.multiSite);}
 function refreshBasicBtn(){const b=$('#btn-to-quiz');if(b)b.disabled=!basicComplete();}
+
+/* ---------- 範例報告：讓還沒填問卷的訪客先看到解鎖後的完整報告長怎樣 ---------- */
+function buildDemoAnswers(){
+  const answers={};
+  ALL_QUESTIONS.forEach(q=>{
+    if(q.numInput){
+      answers[q.id]=q.id==='supply_chain_surveyed'?45:20;
+    }else if(q.multi){
+      if(q.id==='export_market')answers[q.id]=['tw','eu'];
+      else if(q.id==='intl_initiative')answers[q.id]=['cdp'];
+      else if(q.id==='customer_ask_type')answers[q.id]=['esg','supply'];
+      else answers[q.id]=[q.opts[0].v];
+    }else if(q.opts){
+      answers[q.id]=q.opts[Math.min(2,q.opts.length-1)].v;
+    }
+  });
+  return answers;
+}
+async function viewDemoReport(){
+  const btn=$('#btn-view-demo');
+  const origText=btn.textContent;
+  btn.disabled=true;btn.textContent='正在產生範例報告 PDF…';
+
+  const prev={meta:state.meta,answers:state.answers,submissionId:state.submissionId,isDemo:state.isDemo};
+  state.meta={name:'範例科技股份有限公司',email:'demo@example.com',industry:'electronics',empSize:'e3',hasFactory:'yes',multiSite:'multi'};
+  state.answers=buildDemoAnswers();
+  state.submissionId=null;
+  state.isDemo=true;
+
+  /* 直接在畫面外算出報告內容並匯出 PDF，使用者畫面全程停在原本的頁面，不會看到範例報告的 HTML 畫面 */
+  const resultEl=$('#step-result');
+  const wrapWidth=$('.wrap').clientWidth;
+  resultEl.style.setProperty('display','block','important');
+  resultEl.style.position='fixed';
+  resultEl.style.left='-99999px';
+  resultEl.style.top='0';
+  resultEl.style.width=wrapWidth+'px';
+  renderResult();
+  try{
+    await exportPDF();
+  }finally{
+    resultEl.removeAttribute('style');
+    resultEl.innerHTML='';
+    state.meta=prev.meta;state.answers=prev.answers;state.submissionId=prev.submissionId;state.isDemo=prev.isDemo;
+    btn.disabled=false;btn.textContent=origText;
+  }
+}
 
 /* ---------- Step 2：問卷 ---------- */
 function goToQuiz(){
@@ -1072,7 +1123,7 @@ function renderQuiz(){
     $('#step-basic').classList.remove('hidden');
     window.scrollTo({top:0,behavior:'smooth'});
   };
-  $('#btn-to-result').onclick=()=>{ if(allAnswered()) goToPaywall(); };
+  $('#btn-to-result').onclick=()=>{ if(allAnswered()) openConsentModal(); };
 }
 function renderQuizAnswerState(){
   ALL_QUESTIONS.forEach(q=>{
@@ -1293,6 +1344,16 @@ function renderPaywall(){
       </div>
     </div>
 
+    <div class="note-panel" style="background:var(--green-bg);border-color:var(--teal)">
+      <div class="note-block">
+        <div class="note-title">💰 NT$1,000 不是花費，是訂金</div>
+        <p style="font-size:15px;color:var(--ink-2);line-height:1.75">
+          顧問親自產出的健檢報告原價 <b>NT$5,000</b>，線上自主健檢推廣價只要 <b>NT$1,000</b>。
+          日後若採購本公司 ISO 14064／14067 盤查、供應鏈碳排放調查或 DPP 輔導服務，這筆費用<b>可全額折抵</b>。
+        </p>
+      </div>
+    </div>
+
     <div class="note-panel">
       <div class="note-block">
         <div class="note-title">🧾 發票資訊</div>
@@ -1499,6 +1560,16 @@ function renderResult(){
     <div class="sec-head"><span class="eyebrow">Step 3 / 3</span><h2>碳健康健檢報告</h2>
       <p>以下是根據貴公司填答自動計算的健檢結果，包含整體健康度、五項健康指標，以及依現況規劃的下一步行動建議。</p></div>
 
+    ${state.isDemo?`
+    <div class="note-panel" style="background:var(--coral-bg);border-color:var(--coral)">
+      <div class="note-block">
+        <div class="note-title" style="color:var(--coral)">🔖 範例報告（SAMPLE）</div>
+        <p style="font-size:14.5px;color:var(--ink-2);line-height:1.7">
+          以下數據為示範用途，用來讓您了解解鎖後的完整報告與 PDF 會包含哪些內容，並非真實企業資料。填寫貴公司的實際問卷，即可產生專屬於您的健檢報告。
+        </p>
+      </div>
+    </div>`:''}
+
     <div class="health-panel">
       <div class="gauge-wrap">
         <div class="gauge-host">${gaugeSVG(overall,TIER_HEX[tier.key],tier.nm)}</div>
@@ -1542,6 +1613,7 @@ function renderResult(){
         </div>`).join('')}
     </div>
 
+    ${state.isDemo?'':`
     <div class="note-panel" style="margin-top:24px;margin-bottom:0">
       <div class="note-block">
         <div class="note-title">🔖 收藏這個專屬連結</div>
@@ -1554,7 +1626,7 @@ function renderResult(){
         </div>
         <div class="note" id="copy-status" style="margin-top:6px"></div>
       </div>
-    </div>
+    </div>`}
 
     <div class="btn-row">
       <button class="btn btn-primary" id="btn-export-pdf">匯出健檢報告 PDF</button>
@@ -1668,6 +1740,26 @@ function renderResult(){
   $('#btn-export-pdf').onclick=exportPDF;
 }
 
+/* ---------- 範例 PDF 每頁蓋浮水印 ---------- */
+function addSampleWatermark(pdf,pageWidth,pageHeight){
+  pdf.saveGraphicsState();
+  try{
+    pdf.setGState(new pdf.GState({opacity:0.13}));
+  }catch(e){/* 部分環境不支援 GState，改用淺色文字模擬淡化效果 */}
+  pdf.setTextColor(178,59,46);
+  pdf.setFont('helvetica','bold');
+  pdf.setFontSize(52);
+  const label='SAMPLE REPORT'; /* jsPDF 內建字型不含中文字形，浮水印文字只能用英文，避免中文缺字變成方塊 */
+  const stepX=pageWidth*0.9;
+  const stepY=pageHeight*0.32;
+  for(let y=stepY*0.6;y<pageHeight+stepY;y+=stepY){
+    for(let x=-pageWidth*0.2;x<pageWidth+stepX;x+=stepX){
+      pdf.text(label,x,y,{angle:35});
+    }
+  }
+  pdf.restoreGraphicsState();
+}
+
 /* ---------- 匯出 PDF（將畫面截圖轉為多頁 PDF）---------- */
 async function exportPDF(){
   const btn=$('#btn-export-pdf');const orig=btn.textContent;
@@ -1711,6 +1803,7 @@ async function exportPDF(){
     coverEl.innerHTML=`
       <div style="font-size:14px;letter-spacing:.24em;text-transform:uppercase;color:#145C4B;font-weight:700;margin-bottom:52px">數位開創 · DIGITAL CREATION</div>
       <div style="font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:#8A8578;font-weight:700;margin-bottom:14px">CARBON HEALTH REPORT</div>
+      ${state.isDemo?'<div style="display:inline-block;background:#B23B2E;color:#fff;font-weight:800;font-size:13px;letter-spacing:.1em;padding:6px 14px;border-radius:6px;margin-bottom:20px">範例報告 SAMPLE · 非真實企業數據</div>':''}
       <div style="font-size:34px;font-weight:800;color:#16241F;margin-bottom:40px">企業碳健康健檢報告</div>
       <div style="width:56px;height:4px;background:#145C4B;margin-bottom:40px"></div>
       <div style="font-size:30px;font-weight:800;color:#16241F;margin-bottom:12px">${state.meta.name||'貴公司'}</div>
@@ -1748,6 +1841,14 @@ async function exportPDF(){
       }
       pdf.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',marginPt,cursorY,blockWidthPt,blockHeightPt);
       cursorY+=blockHeightPt+8;
+    }
+
+    if(state.isDemo){
+      const totalPages=pdf.internal.getNumberOfPages();
+      for(let i=1;i<=totalPages;i++){
+        pdf.setPage(i);
+        addSampleWatermark(pdf,pageWidth,pageHeight);
+      }
     }
 
     const safeName=(state.meta.name||'企業').replace(/[\\/:*?"<>|]/g,'_');
@@ -1801,6 +1902,7 @@ function setupFindReport(){
 (function initApp(){
   setupFindReport();
   setupConsentModal();
+  $('#btn-view-demo').onclick=viewDemoReport;
   const params=new URLSearchParams(location.search);
   const sid=params.get('sid');
   if(sid&&SID_RE_CLIENT.test(sid)){
